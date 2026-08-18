@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
@@ -46,11 +47,16 @@ func Recover(logger *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if value := recover(); value != nil {
-					logger.ErrorContext(r.Context(), "panic recovered", "panic", value, "stack", string(debug.Stack()), "request_id", RequestIDFrom(r.Context()))
-					message := []byte(`{"code":"internal_error","message":"internal server error"}`)
+					requestID := RequestIDFrom(r.Context())
+					logger.ErrorContext(r.Context(), "panic recovered", "panic", value, "stack", string(debug.Stack()), "request_id", requestID)
+					body, _ := json.Marshal(map[string]any{
+						"code":       "internal_error",
+						"message":    "internal server error",
+						"request_id": requestID,
+					})
 					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusOK)
-					if _, writeErr := w.Write(message); writeErr != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					if _, writeErr := w.Write(body); writeErr != nil {
 						logger.ErrorContext(r.Context(), "panic response failed", "error", writeErr)
 					}
 					return
