@@ -47,12 +47,10 @@ func Recover(logger *slog.Logger) func(http.Handler) http.Handler {
 			defer func() {
 				if value := recover(); value != nil {
 					logger.ErrorContext(r.Context(), "panic recovered", "panic", value, "stack", string(debug.Stack()), "request_id", RequestIDFrom(r.Context()))
-					message := []byte(`{"code":"internal_error","message":"internal server error"}`)
 					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusOK)
-					if _, writeErr := w.Write(message); writeErr != nil {
-						logger.ErrorContext(r.Context(), "panic response failed", "error", writeErr)
-					}
+					w.WriteHeader(http.StatusInternalServerError)
+					body := []byte(`{"code":"internal_error","message":"internal server error"}`)
+					_, _ = w.Write(body)
 					return
 				}
 			}()
